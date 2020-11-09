@@ -1,0 +1,62 @@
+%sh
+echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list
+
+%sh
+if [ -e /databricks/driver/linux_signing_key.pub ]; then
+  echo "Linux Signing Key is already present on the cluster at /databricks/driver"
+else
+  echo "DownLoading Linux Signing Key file"
+  wget https://dl.google.com/linux/linux_signing_key.pub
+  sudo apt-key add linux_signing_key.pub
+  sudo apt update
+  echo "Downloading Google Chrome Stable Version"
+  sudo apt install -y google-chrome-stable
+fi
+
+%sh
+#we are making sure that we are downoading the compatible chrome driver version by doing the below steps.Above command download the stable version of google chrome from the repository and that version can vary based on the releases that are made for chrome browser.
+#getting the current chrome browser version
+chromeVersion=$(google-chrome --product-version)
+echo "Chrome Browser Version = "$chromeVersion
+
+#getting the major version value from the full version
+chromeMajorVersion=${chromeVersion%%.*}
+
+# setting the base url for getting the release url for the chrome driver
+baseDriverLatestReleaseURL=https://chromedriver.storage.googleapis.com/LATEST_RELEASE_
+
+#creating the latest release driver url based on the major version of the chrome
+latestDriverReleaseURL=$baseDriverLatestReleaseURL$chromeMajorVersion
+echo "Chrome Driver Latest Release URL = "$latestDriverReleaseURL
+
+#file name of the file that gets downloaded which would contain the full version of the chrome driver to download
+latestDriverVersionFileName="LATEST_RELEASE_"$chromeMajorVersion
+
+if [ -e "/databricks/driver/"$latestDriverVersionFileName ]; then
+  echo "Latest Release file already exists with exact version to use for downloading compatible chrome driver"
+else
+  echo "DownLoading Latest Release Driver File"
+  wget $latestDriverReleaseURL 
+fi
+
+#reading the file to get the version of the chrome driver that we should download
+latestFullDriverVersion=$(cat $latestDriverVersionFileName)
+echo "Chrome Driver Version = "$latestFullDriverVersion
+
+#creating the final URL by passing the compatible version of the chrome driver that we should download
+finalURL="https://chromedriver.storage.googleapis.com/"$latestFullDriverVersion"/chromedriver_linux64.zip"
+echo "Chrome Driver Download URL = "$finalURL
+
+if [ -e /databricks/driver/chromedriver_linux64.zip ]; then
+  echo "Chrome Driver Zip is already present on the cluster at /databricks/driver"
+else
+  echo "DownLoading Chrome Driver zip file"
+   wget $finalURL
+fi
+
+if [ -e /usr/local/bin/chromedriver ]; then
+  echo "Chrome Driver exe is already present at the specified Location: /usr/local/bin"
+else
+  echo "unzipping the Chrome Driver exe at location /usr/local/bin"
+  unzip chromedriver_linux64.zip -d /usr/local/bin
+fi
